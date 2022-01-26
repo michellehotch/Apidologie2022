@@ -1,0 +1,352 @@
+---
+title: "Mating Short Communication Stats"
+author: Michelle Zoë Hotchkiss
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+# Set Up
+
+Load packages
+
+```{r}
+library(tidyverse)
+library(MetBrewer)
+library(car)
+library(lmtest)
+library(PerformanceAnalytics)
+```
+
+
+Load mating and survival data data.
+
+```{r}
+matingdata <- read.csv("data/matingdata.csv", stringsAsFactors = TRUE, na.strings=c(""))
+
+str(matingdata)
+```
+
+
+
+```{r}
+matingdata_survival <- read.csv("data/matingdata_survival.csv", stringsAsFactors = TRUE, na.strings=c(""))
+
+str(matingdata_survival)
+```
+
+# Figure 1: Boxplot of mating type vs relative weight difference
+
+```{r}
+matingdata %>% 
+  ggplot(aes(x=mating_type, y=rel_prehib_weightdiff, fill=mating_type)) + 
+  geom_boxplot(alpha=0.8)+
+  geom_jitter(shape=16, position=position_jitter(0))+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Mating Type")+
+  scale_y_continuous(name ="Relative Difference in Weight \nFrom 0 to 10 Days Post-Eclosion")+
+  scale_fill_manual(values = met.brewer("Homer1",2))
+
+#Homer1
+```
+
+
+#Figure of relative weight difference vs. day 0 weight
+
+```{r}
+matingdata %>% 
+  ggplot(aes(x=day_0_weight, y=rel_prehib_weightdiff, color=mating_type)) + 
+  geom_point(alpha=0.8)+
+  geom_smooth()+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_continuous(name="Day 0 Weight (mg)")+
+  scale_y_continuous(name ="Relative Difference in Weight \nFrom 0 to 10 Days Post-Eclosion")
+```
+
+
+#Figure of day 0 vs. day 10 weight
+
+```{r}
+matingdata %>% 
+  ggplot(aes(x=day_0_weight, y=day_10_weight, color=mating_type)) + 
+  geom_point(alpha=0.8)+
+  geom_smooth()+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_continuous(name="Day 0 Weight (mg)")+
+  scale_y_continuous(name ="Day 10 Weight (mg)")
+```
+
+
+# Statistical Analyses
+
+Means
+
+```{r}
+matingdata %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(rel_prehib_weightdiff))
+```
+
+
+## ANCOVA 
+
+### Set initial model
+
+```{r}
+matingmodel1 <- lm(rel_prehib_weightdiff ~ mating_type+day_0_weight, data=matingdata)
+
+#for this step, i predict that mated bees will gain more weight regardless of how much they weigh at day 0, so i did not include an interaction. also i don't think we have the power to include an interaction (i.e., so few low weight mated and so few mated in general), so i think it's better to fit the simpler model. perhaps more balanced designs later can detect an interaction
+```
+
+###Test assumptions
+
+Visually:
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+plot(matingmodel1)
+par(opar)
+```
+
+With statistical tests:
+
+```{r}
+#Test for normality
+shapiro.test(residuals(matingmodel1))
+#W = 0.94973, p-value = 0.1306
+
+#Test for homoscedasticity
+bptest(matingmodel1)
+#BP = 3.6985, df = 2, p-value = 0.1574
+```
+
+Assumptions are met.
+
+### Examine results of model 1
+
+```{r}
+Anova(matingmodel1, type = 3)
+
+#Anova Table (Type III tests)
+
+#Response: rel_prehib_weightdiff
+#               Sum Sq Df F value   Pr(>F)   
+#(Intercept)  0.081752  1 11.3878 0.002057 **
+#mating_type  0.092466  1 12.8801 0.001165 **
+#day_0_weight 0.018835  1  2.6236 0.115752   
+#Residuals    0.215369 30                    
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+```
+
+## Relationship between day mated and weight gain
+
+```{r}
+matingdata %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=day_mated, y=rel_prehib_weightdiff, color=mating_type)) + 
+  geom_point()
+```
+
+doesn't look like much, so i think we're in the clear, but we can run stats on it later to be sure
+
+
+## Mortality Analysis
+
+### Figure
+
+Figure of percent mortality by mating at 4 months
+
+```{r}
+matingdata_survival %>% 
+  filter(treatment == "Recovery C"|treatment=="Recovery G"| treatment == "4 month") %>% 
+  drop_na(mating_type) %>% 
+  group_by(status, mating_type) %>% 
+  summarise(n=n()) %>% 
+  ggplot(aes(x=status, y=n, fill=status)) + 
+  geom_bar(stat='identity')+
+  facet_grid(. ~ mating_type) +
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Status")+
+  scale_y_continuous(name ="Number of Bees", limits =c(0,20), expand = c(0, 0))+
+  scale_fill_manual(values = met.brewer("Homer1",2))
+```
+
+Point graph of essentially the same info, not sure which one is better 
+
+```{r}
+matingdata_survival %>% 
+  ggplot(aes(x=day_0_weight, y=status, color=mating_type)) + 
+  geom_point(position = position_jitter(w = 0, h = 0.05, seed = 22),size = 3)+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16),
+        legend.position = "right",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_continuous(name="Day 0 Weight (mg)")+
+  scale_y_discrete(name ="Survival Status", limits = rev)+
+  scale_color_manual(values = met.brewer("Homer1",2))
+```
+
+
+With all end points
+
+```{r}
+matingdata_survival %>% 
+  drop_na(mating_type) %>% 
+  group_by(status, mating_type) %>% 
+  summarise(n=n()) %>% 
+  ggplot(aes(x=status, y=n, fill=status)) + 
+  geom_bar(stat='identity')+
+  facet_grid(. ~ mating_type) +
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Status")+
+  scale_y_continuous(name ="Number of Bees", limits =c(0,30), expand = c(0, 0))+
+  scale_fill_manual(values = met.brewer("Homer1",2))
+```
+
+### Survival Analysis with Multiple Logistic Regression
+
+Using code from https://rcompanion.org/rcompanion/e_07.html, assumptions from http://www.biostathandbook.com/multiplelogistic.html
+
+Our variables have to be made numeric. Start by selecting just the variables that we want.
+
+```{r}
+matingdata_survival_numeric <- matingdata_survival %>% 
+  select(day_0_weight, day_10_weight, mating_type, prehib_weightdiff, status)
+
+matingdata_survival_numeric$prehib_weightdiff <- as.numeric(matingdata_survival_numeric$prehib_weightdiff)
+
+str(matingdata_survival_numeric)
+```
+
+Then make everything numeric
+
+```{r}
+matingdata_survival_numeric$mating_type_num <- as.numeric(matingdata_survival_numeric$mating_type)
+#1 = mated, 2 = unmated
+
+matingdata_survival_numeric$status_num <- as.numeric(matingdata_survival_numeric$status)
+#1 = alive, 2 = dead
+
+#change the 2 for dead to a zero
+matingdata_survival_numeric$status_num <-
+  replace(matingdata_survival_numeric$status_num,matingdata_survival_numeric$status_num == 2,0)
+
+#use str to double check that variables are coded properly
+str(matingdata_survival_numeric)
+```
+
+Make variable for relative pre-hibernation weight difference
+
+```{r}
+matingdata_survival_numeric$rel_prehib_weightdiff <- ((matingdata_survival_numeric$day_10_weight-matingdata_survival_numeric$day_0_weight)/matingdata_survival_numeric$day_0_weight)
+  
+str(matingdata_survival_numeric)
+```
+
+
+####Correlation Analysis
+
+Remove the factors for the correlation analysis.
+
+```{r}
+matingdata_survival_numeric_nofac <- matingdata_survival_numeric[-c(3,5)]
+str(matingdata_survival_numeric_nofac)
+```
+
+
+Examine correlation among variables
+
+```{r}
+chart.Correlation(matingdata_survival_numeric_nofac, method = "spearman", histogram = TRUE)
+```
+
+Variance inflation factors to detect multi-colinearity
+
+```{r}
+vif(survival_model1)
+
+#      mating_type_num          day_0_weight rel_prehib_weightdiff 
+#             1.000000              1.133545              1.133545
+```
+
+No evidence of colinearity
+
+
+#### Survival Model 1
+
+```{r}
+survival_model1 <- glm(status_num ~ mating_type_num + day_0_weight + rel_prehib_weightdiff, data = matingdata_survival_numeric_nofac, family= binomial)
+
+
+summary(survival_model1)
+
+#Deviance Residuals: 
+#    Min       1Q   Median       3Q      Max  
+#-2.1250  -0.7497   0.3423   0.6258   1.8828  
+
+#Coefficients:
+#                        Estimate Std. Error z value Pr(>|z|)   
+#(Intercept)            2.820e+01  4.827e+03   0.006  0.99534   
+#mating_type_num       -1.668e+01  2.414e+03  -0.007  0.99449   
+#day_0_weight           8.884e-03  2.736e-03   3.247  0.00117 **
+#rel_prehib_weightdiff  1.342e+01  5.997e+00   2.238  0.02522 * 
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 70.252  on 52  degrees of freedom
+#Residual deviance: 47.177  on 49  degrees of freedom
+#AIC: 55.177
+
+#Number of Fisher Scoring iterations: 17
+```
+
+Plot residuals
+
+```{r}
+plot(fitted(survival_model1),
+     rstandard(survival_model1))
+```
+
+Check for overdispersion
+
+Overdispersion is a situation where the residual deviance of the glm is large relative to the residual degrees of freedom. 
+One guideline is that if the ratio of the residual deviance to the residual degrees of freedom exceeds 1.5, then the model is overdispersed. 
+
+```{r}
+summary(survival_model1)$deviance / summary(survival_model1)$df.residual
+
+#0.962797
+```
+
+
+
+
+
+

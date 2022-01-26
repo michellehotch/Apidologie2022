@@ -20,7 +20,7 @@ Load data
 
 
 ```{r}
-matingdata_dead <- read.csv("Mating Data/matingdatawdead.csv", stringsAsFactors = TRUE, na.strings=c(""))
+matingdata_dead <- read.csv("data/matingdatawdead.csv", stringsAsFactors = TRUE, na.strings=c(""))
 
 str(matingdata)
 ```
