@@ -1,0 +1,827 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+## Setup 
+
+Load packages
+
+```{r}
+library(tidyverse)
+```
+
+
+Load mating data.
+
+```{r}
+matingdata <- read.csv("Mating Data/matingdataR.csv", stringsAsFactors = TRUE, na.strings=c(""))
+
+str(matingdata)
+```
+
+Recode mating types
+
+```{r}
+matingdata_recoded <- matingdata %>% 
+  mutate(mating_type = recode(mating_type, None = "None", Normal = "Dorsal", Spasm = "Recline"))
+
+str(matingdata_recoded)
+```
+
+
+## Weight Gain Differences by Mating Type
+
+Means
+
+```{r}
+matingdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(prehib_weightdiff))
+```
+
+
+Boxplot of mating type vs weight diff
+
+```{r}
+matingdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=mating_type, y=prehib_weightdiff, fill=mating_type)) + 
+  geom_boxplot(alpha=0.5)+
+  geom_jitter(shape=16, position=position_jitter(0))+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Mating Type")+
+  scale_y_continuous(name ="Difference in Weight From 0 \nto 10 Days Post-Eclosion (mg)")
+```
+
+Line graph of initial weight vs. weight gain
+
+```{r}
+matingdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=day_0_weight, y=prehib_weightdiff, color = mating_type)) + 
+  geom_point()
+```
+
+#### ANOVA 
+
+Before we do ANOVAs, permanently remove NAs from mating type.
+
+```{r}
+matingdata_anova <- matingdata_recoded %>% 
+  drop_na(mating_type)
+
+str(matingdata_anova)
+  
+```
+
+Anova for differences
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+weightdiff.model1 <- lm(prehib_weightdiff ~ mating_type, data=matingdata_anova) 
+plot(weightdiff.model1)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(weightdiff.model1))
+#p = 0.5189
+
+#Test for homoscedasticity
+require(car)
+leveneTest(prehib_weightdiff ~ mating_type, data=matingdata_anova)
+#p = 0.9245
+```
+
+Assumptions are met (wildly) so on with the ANOVA!
+
+```{r}
+summary(weightdiff.model1)
+
+TukeyHSD(aov(prehib_weightdiff ~ mating_type, data=matingdata_anova))
+plot(TukeyHSD(aov(prehib_weightdiff ~ mating_type, data=matingdata_anova)))
+```
+
+Also test Type III ANOVA because we have an unbalanced design.
+
+```{r}
+Anova(weightdiff.model1, type = 3)
+```
+
+Still significant! We're good to go.
+
+Code for better Tukey Plot
+
+```{r}
+anova.weightdiff <- aov(aov(prehib_weightdiff ~ mating_type, data=matingdata_anova))
+# set up all-pairs comparisons for factor `year'
+library(multcomp)
+meandiff_weightdiff <- glht(anova.weightdiff , linfct = mcp(mating_type =
+"Tukey"))
+confint(meandiff_weightdiff)
+
+
+old.par <- par(mai = c(1, 1.25, 1, 1))
+plot(meandiff_weightdiff)
+par(old.par)
+```
+
+#### LM including Day_0_Weight
+
+Before we do LM, permanently remove NAs from mating type.
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+weightdiff.day0 <- lm(prehib_weightdiff ~ mating_type + day_0_weight, data=matingdata_anova) 
+plot(weightdiff.day0)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(weightdiff.day0))
+#p = 0.5189
+
+#Test for homoscedasticity **not applicable**
+require(car)
+leveneTest(prehib_weightdiff ~ mating_type + day_0_weight, data=matingdata_anova)
+#p = 0.9245
+```
+
+Assumptions are met (wildly) so on with the LM!
+
+```{r}
+summary(weightdiff.day0)
+```
+
+Summary suggests that day_0_weight has no effect. 
+
+## Relative Weight Gain Difference by Mating Type
+
+Means
+
+```{r}
+matingdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(rel_prehib_weightdiff))
+```
+
+
+Boxplot of mating type vs weight diff
+
+```{r}
+matingdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=mating_type, y=rel_prehib_weightdiff, fill=mating_type)) + 
+  geom_boxplot(alpha=0.5)+
+  geom_jitter(shape=16, position=position_jitter(0))+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Mating Type")+
+  scale_y_continuous(name ="Relative Difference in Weight \nFrom 0 to 10 Days Post-Eclosion")
+```
+
+#### ANOVA 
+
+Before we do ANOVAs, permanently remove NAs from mating type.
+
+```{r}
+matingdata_anova <- matingdata_recoded %>% 
+  drop_na(mating_type)
+
+str(matingdata_anova)
+  
+```
+
+Anova for differences
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+
+relweightdiff.model1 <- lm(rel_prehib_weightdiff ~ mating_type, data=matingdata_anova) 
+
+plot(relweightdiff.model1)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(relweightdiff.model1))
+#p = 0.05044
+
+#Test for homoscedasticity
+require(car)
+leveneTest(rel_prehib_weightdiff ~ mating_type, data=matingdata_anova)
+#p = 0.8882
+```
+
+Assumptions are met (wildly) so on with the ANOVA!
+
+```{r}
+summary(relweightdiff.model1)
+
+TukeyHSD(aov(rel_prehib_weightdiff ~ mating_type, data=matingdata_anova))
+plot(TukeyHSD(aov(rel_prehib_weightdiff ~ mating_type, data=matingdata_anova)))
+```
+
+Also test Type III ANOVA because we have an unbalanced design.
+
+```{r}
+Anova(relweightdiff.model1, type = 3)
+```
+
+Still significant! We're good to go.
+
+Code for better Tukey Plot
+
+```{r}
+anova.relweightdiff <- aov(aov(rel_prehib_weightdiff ~ mating_type, data=matingdata_anova))
+# set up all-pairs comparisons for factor `year'
+library(multcomp)
+meandiff_relweightdiff <- glht(anova.relweightdiff , linfct = mcp(mating_type =
+"Tukey"))
+confint(meandiff_relweightdiff)
+
+
+old.par <- par(mai = c(1, 1.25, 1, 1))
+plot(meandiff_relweightdiff)
+par(old.par)
+```
+
+#### LM including Day_0_Weight
+
+Line graph of initial weight vs. weight gain
+
+```{r}
+matingdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=day_0_weight, y=rel_prehib_weightdiff, color = mating_type)) + 
+  geom_point()
+```
+
+Before we do LM, permanently remove NAs from mating type.
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+relweightdiff.day0 <- lm(rel_prehib_weightdiff ~ mating_type + day_0_weight, data=matingdata_anova) 
+plot(relweightdiff.day0)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(relweightdiff.day0))
+#p = 0.3346
+
+#Test for homoscedasticity **not applicable**
+require(car)
+leveneTest(rel_prehib_weightdiff ~ mating_type + day_0_weight, data=matingdata_anova)
+#p = 0.9245
+```
+
+Assumptions are met (wildly) so on with the LM!
+
+```{r}
+summary(relweightdiff.day0)
+
+#day_0_weight is 0.0776
+#mating_typeRecline is more significant though 0.0035
+```
+
+Summary suggests that day_0_weight has no effect. 
+
+## Differences in Day 0 Weight by Mating Type
+
+Means
+
+```{r}
+matingdata %>% 
+  drop_na(mating_type) %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(day_0_weight))
+```
+
+
+Boxplot/dot plot
+
+```{r}
+matingdata %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=mating_type, y=day_0_weight, fill=mating_type)) + 
+  geom_boxplot(alpha=0.5)+
+  geom_jitter(shape=16, position=position_jitter(0))+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Mating Type")+
+  scale_y_continuous(name ="Weight at Eclosion (mg)")
+```
+
+Stats - these include the one unknown point, might want to remove that
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+day0weight.model1 <- lm(day_0_weight~ mating_type, data=matingdata) 
+plot(day0weight.model1)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(day0weight.model1))
+#p = 0.001013
+
+#Test for homoscedasticity
+require(car)
+leveneTest(day_0_weight ~ mating_type, data=matingdata)
+#p = 0.4083
+```
+
+Normality is violated, but homoscedasticity is okay.
+
+Do parametric first:
+
+```{r}
+summary(day0weight.model1)
+
+TukeyHSD(aov(day_0_weight ~ mating_type, data=matingdata))
+plot(TukeyHSD(aov(day_0_weight ~ mating_type, data=matingdata)))
+```
+
+Code for better Tukey Plot
+
+```{r}
+anova.day0weight <- aov(aov(day_0_weight ~ mating_type, data=matingdata))
+# set up all-pairs comparisons for factor `year'
+library(multcomp)
+meandiff <- glht(anova.day0weight, linfct = mcp(mating_type =
+"Tukey"))
+confint(meandiff)
+
+
+old.par <- par(mai = c(1, 1.25, 1, 1))
+plot(meandiff)
+par(old.par)
+```
+
+
+Non-parametric (Kruskal-Wallis):
+
+```{r}
+matingdata %>% 
+  kruskal.test(day_0_weight ~ mating_type)
+
+#p < 2.2e-16
+```
+
+
+## RECLINE = NON-MATING
+
+## Setup 
+
+Load packages
+
+```{r}
+library(tidyverse)
+```
+
+
+Load mating data.
+
+```{r}
+matvsnmdata <- read.csv("Mating Data/matingdataR.csv", stringsAsFactors = TRUE, na.strings=c(""))
+
+str(matvsnmdata)
+```
+
+Recode mating types
+
+```{r}
+matvsnmdata_recoded <- matvsnmdata %>% 
+  mutate(mating_type = recode(mating_type, None = "None", Normal = "None", Spasm = "Mated"))
+
+str(matvsnmdata_recoded)
+```
+
+
+## Weight Gain Differences by Mating Type
+
+Means
+
+```{r}
+matvsnmdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(prehib_weightdiff))
+```
+
+
+Boxplot of mating type vs weight diff
+
+```{r}
+matvsnmdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=mating_type, y=prehib_weightdiff, fill=mating_type)) + 
+  geom_boxplot(alpha=0.5)+
+  geom_jitter(shape=16, position=position_jitter(0))+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Mating Type")+
+  scale_y_continuous(name ="Difference in Weight From 0 \nto 10 Days Post-Eclosion (mg)")
+```
+
+Variances don't look equal, non-mating is larger than mated. 
+
+Line graph of initial weight vs. weight gain
+
+```{r}
+matvsnmdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=day_0_weight, y=prehib_weightdiff, color = mating_type)) + 
+  geom_point()
+```
+
+#### T-test
+
+Before we do ANOVAs, permanently remove NAs from mating type.
+
+```{r}
+matvsnmdata_ttest <- matvsnmdata_recoded %>% 
+  drop_na(mating_type)
+
+str(matvsnmdata_ttest)
+  
+```
+
+T-test for differences
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+weightdiffmatnm.model1 <- lm(prehib_weightdiff ~ mating_type, data=matvsnmdata_ttest)
+plot(weightdiffmatnm.model1)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(weightdiffmatnm.model1))
+#p = 0.5247
+
+#Test for homoscedasticity
+require(car)
+leveneTest(prehib_weightdiff ~ mating_type, data=matvsnmdata_ttest)
+#p = 0.8674
+```
+
+Assumptions are met (wildly) so on with the t-test!
+
+```{r}
+t.test(prehib_weightdiff ~ mating_type, alternative='two.sided', conf.level=.95, var.equal=FALSE, data = matvsnmdata_ttest)
+```
+
+Welch Two Sample t-test
+
+data:  prehib_weightdiff by mating_type
+t = -3.9453, df = 5.3065, p-value = 0.009686
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -181.96206  -39.88937
+sample estimates:
+ mean in group None mean in group Mated 
+           17.11429           128.04000
+
+Significant! We're good to go.
+
+
+#### LM including Day_0_Weight
+
+Before we do LM, permanently remove NAs from mating type.
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+weightdiffmatnm.day0 <- lm(prehib_weightdiff ~ mating_type + day_0_weight, data=matvsnmdata_ttest) 
+plot(weightdiffmatnm.day0)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(weightdiffmatnm.day0))
+#p = 0.8906
+
+#Test for homoscedasticity **not applicable**
+require(car)
+leveneTest(prehib_weightdiff ~ mating_type + day_0_weight, data=matvsnmdata_ttest)
+```
+
+Assumptions are met (wildly) so on with the LM!
+
+```{r}
+summary(weightdiffmatnm.day0)
+```
+
+Call:
+lm(formula = prehib_weightdiff ~ mating_type + day_0_weight, 
+    data = matvsnmdata_ttest)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-116.490  -29.446    1.259   31.242  146.070 
+
+Coefficients:
+                  Estimate Std. Error t value Pr(>|t|)    
+(Intercept)       75.04661   50.56666   1.484 0.148211    
+mating_typeMated 114.95514   26.71005   4.304 0.000165 ***
+day_0_weight      -0.08643    0.07386  -1.170 0.251115    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 54.56 on 30 degrees of freedom
+Multiple R-squared:  0.3866,	Adjusted R-squared:  0.3457 
+F-statistic: 9.454 on 2 and 30 DF,  p-value: 0.0006548
+
+
+Summary suggests that day_0_weight has no effect. 
+
+## Relative Weight Gain Difference by Mating Type
+
+Means
+
+```{r}
+matvsnmdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(rel_prehib_weightdiff))
+```
+
+
+Boxplot of mating type vs weight diff
+
+```{r}
+matvsnmdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=mating_type, y=rel_prehib_weightdiff, fill=mating_type)) + 
+  geom_boxplot(alpha=0.5)+
+  geom_jitter(shape=16, position=position_jitter(0))+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Mating Type")+
+  scale_y_continuous(name ="Relative Difference in Weight \nFrom 0 to 10 Days Post-Eclosion")
+```
+
+Variance of non-mating looks larger
+
+
+### Testing to see if day mated looks related to relative weight gain at all
+
+```{r}
+matvsnmdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=day_mated, y=rel_prehib_weightdiff, fill=mating_type)) + 
+  geom_point()
+```
+
+doesn't look like much, so i think we're in the clear, but we can run stats on it later to be sure
+
+
+#### T-test 
+
+Before we do t-test, permanently remove NAs from mating type.
+
+```{r}
+matvsnmdata_ttest <- matvsnmdata_recoded %>% 
+  drop_na(mating_type)
+
+str(matvsnmdata_ttest)
+  
+```
+
+t-test for differences
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+
+relweightdiffmatnm.model1 <- lm(rel_prehib_weightdiff ~ mating_type, data=matvsnmdata_ttest) 
+
+plot(relweightdiffmatnm.model1)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(relweightdiffmatnm.model1))
+#p = 0.05435
+
+#Test for homoscedasticity
+require(car)
+leveneTest(rel_prehib_weightdiff ~ mating_type, data=matvsnmdata_ttest)
+#p = 0.6073
+```
+
+Assumptions are met (wildly) so on with the t-test!
+
+```{r}
+t.test(rel_prehib_weightdiff ~ mating_type, alternative='two.sided', conf.level=.95, var.equal=FALSE, data = matvsnmdata_ttest)
+```
+
+	Welch Two Sample t-test
+
+data:  rel_prehib_weightdiff by mating_type
+t = -3.8443, df = 6.3739, p-value = 0.007584
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.22820607 -0.05222081
+sample estimates:
+ mean in group None mean in group Mated 
+         0.03213141          0.17234485 
+
+
+
+Significant!
+
+Do non-parametric as well
+
+```{r}
+wilcox.test(rel_prehib_weightdiff ~ mating_type, alternative="two.sided", data=matvsnmdata_ttest)
+```
+
+Wilcoxon rank sum exact test
+
+data:  rel_prehib_weightdiff by mating_type
+W = 12, p-value = 0.00166
+alternative hypothesis: true location shift is not equal to 0
+
+
+
+#### LM including Day_0_Weight
+
+Line graph of initial weight vs. weight gain
+
+```{r}
+matvsnmdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=day_0_weight, y=rel_prehib_weightdiff, color = mating_type)) + 
+  geom_point()
+```
+
+Before we do LM, permanently remove NAs from mating type.
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+relweightdiffmatnm.day0 <- lm(rel_prehib_weightdiff ~ mating_type + day_0_weight, data=matvsnmdata_ttest) 
+plot(relweightdiffmatnm.day0)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(relweightdiffmatnm.day0))
+#p = 0.1306
+
+#Test for homoscedasticity **not applicable**
+```
+
+Assumptions are met (wildly) so on with the LM!
+
+```{r}
+summary(relweightdiffmatnm.day0)
+
+#day_0_weight is 0.0776
+#mating_typeRecline is more significant though 0.0035
+```
+
+
+Call:
+lm(formula = rel_prehib_weightdiff ~ mating_type + day_0_weight, 
+    data = matvsnmdata_ttest)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-0.150418 -0.041247  0.001425  0.033785  0.261889 
+
+Coefficients:
+                   Estimate Std. Error t value Pr(>|t|)   
+(Intercept)       0.1566632  0.0785331   1.995  0.05521 . 
+mating_typeMated  0.1488751  0.0414823   3.589  0.00117 **
+day_0_weight     -0.0001858  0.0001147  -1.620  0.11575   
+
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.08473 on 30 degrees of freedom
+Multiple R-squared:  0.3219,	Adjusted R-squared:  0.2767 
+F-statistic: 7.121 on 2 and 30 DF,  p-value: 0.002947
+
+
+Summary suggests that day_0_weight has no effect. 
+
+## Differences in Day 0 Weight by Mating Type
+
+Means
+
+```{r}
+matvsnmdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(day_0_weight))
+```
+
+
+Boxplot/dot plot
+
+```{r}
+matvsnmdata_recoded %>% 
+  drop_na(mating_type) %>% 
+  ggplot(aes(x=mating_type, y=day_0_weight, fill=mating_type)) + 
+  geom_boxplot(alpha=0.5)+
+  geom_jitter(shape=16, position=position_jitter(0))+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Mating Type")+
+  scale_y_continuous(name ="Weight at Eclosion (mg)")
+```
+
+Stats - these include the one unknown point, might want to remove that
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+day0weightmatnm.model1 <- lm(day_0_weight~ mating_type, data=matvsnmdata_recoded) 
+plot(day0weightmatnm.model1)
+par(opar)
+```
+
+```{r}
+#Test for normality
+shapiro.test(residuals(day0weightmatnm.model1))
+#p = 0.005069
+
+#Test for homoscedasticity
+require(car)
+leveneTest(day_0_weight ~ mating_type, data=matvsnmdata_recoded)
+#p = 0.7036
+```
+
+Normality is violated, but homoscedasticity is okay.
+
+Do parametric first:
+
+```{r}
+t.test(day_0_weight~ mating_type, alternative='two.sided', conf.level=.95, var.equal=FALSE, data = matvsnmdata_recoded)
+```
+
+	Welch Two Sample t-test
+
+data:  day_0_weight by mating_type
+t = -0.65527, df = 5.1429, p-value = 0.5405
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -227.9849  134.7463
+sample estimates:
+ mean in group None mean in group Mated 
+           670.2607            716.8800 
+
+
+Not significant
+
+
+Non-parametric (Kruskal-Wallis):
+
+```{r}
+wilcox.test(day_0_weight ~ mating_type, alternative="two.sided", data=matvsnmdata_recoded)
+```
+
+	Wilcoxon rank sum exact test
+
+data:  day_0_weight by mating_type
+W = 57, p-value = 0.5416
+alternative hypothesis: true location shift is not equal to 0
+
+Not significant
+
