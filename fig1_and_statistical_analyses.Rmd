@@ -22,33 +22,48 @@ library(PerformanceAnalytics)
 Load mating and survival data data.
 
 ```{r}
-matingdata <- read.csv("data/matingdata.csv", stringsAsFactors = TRUE, na.strings=c(""))
+matingdata <- read.csv("data/matingdata_allqueens.csv", stringsAsFactors = TRUE, na.strings=c(""))
 
 str(matingdata)
+
+matingdata$emergence_weight <- as.numeric(matingdata$emergence_weight)
+
+matingdata$end_weight <- as.numeric(matingdata$end_weight)
+
+matingdata$hib_weightloss <- as.numeric(matingdata$hib_weightloss)
+
+matingdata$rec_weightdiff <- as.numeric(matingdata$rec_weightdiff)
+
 ```
 
-
-
-```{r}
-matingdata_survival <- read.csv("data/matingdata_survival.csv", stringsAsFactors = TRUE, na.strings=c(""))
-
-str(matingdata_survival)
-```
 
 # Figure 1: Boxplot of mating type vs relative weight difference
 
 ```{r}
+md_summary <- matingdata %>% 
+  filter(!(is.na(mating_type))) %>% 
+  group_by(mating_type) %>% 
+  tally()
+
+md_summary
+```
+
+Boxplot:
+
+```{r}
 matingdata %>% 
+  filter(!(is.na(mating_type))) %>% 
   ggplot(aes(x=mating_type, y=rel_prehib_weightdiff, fill=mating_type)) + 
   geom_boxplot(alpha=0.8)+
-  geom_jitter(shape=16, position=position_jitter(0))+
+  geom_jitter(shape=16, position=position_jitter(0), size=2)+
+  #geom_text(data = md_summary, aes(mating_type, Inf, label = n), vjust = 2)+
   theme_classic()+
   theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
         axis.text.y = element_text(size = 16, color = "black"),
         legend.position = "none",
         axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
         axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
-  scale_x_discrete(name="Mating Type")+
+  scale_x_discrete(name="Mating Status")+
   scale_y_continuous(name ="Relative Difference in Weight \nFrom 0 to 10 Days Post-Eclosion")+
   scale_fill_manual(values = met.brewer("Homer1",2))
 
@@ -56,7 +71,7 @@ matingdata %>%
 ```
 
 
-#Figure of relative weight difference vs. day 0 weight
+#Figure of relative weight difference vs. day 0 weight - this is more true to the model, but a little more complicated. Do you prefer this or the boxplot?
 
 ```{r}
 matingdata %>% 
@@ -91,6 +106,45 @@ matingdata %>%
   scale_y_continuous(name ="Day 10 Weight (mg)")
 ```
 
+# Weight loss over hibernation
+
+
+```{r}
+matingdata %>% 
+  filter(!(is.na(mating_type))) %>% 
+  ggplot(aes(x=mating_type, y=hib_weightloss, fill=mating_type)) + 
+  geom_boxplot(alpha=0.8)+
+  geom_jitter(shape=16, position=position_jitter(0))+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Mating Type")+
+  scale_y_continuous(name ="Hibernation Weight Loss")+
+  scale_fill_manual(values = met.brewer("Homer1",2))
+
+#Homer1
+```
+
+Line
+```{r}
+matingdata %>% 
+  ggplot(aes(x=day_0_weight, y=hib_weightloss, color=mating_type)) + 
+  geom_point(alpha=0.8)+
+  geom_smooth()+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_continuous(name="Day 0 Weight (mg)")+
+  scale_y_continuous(name ="Hibernation Weight Loss")
+```
+
+
 
 # Statistical Analyses
 
@@ -98,8 +152,15 @@ Means
 
 ```{r}
 matingdata %>% 
+  filter(!(is.na(mating_type))) %>% 
   group_by(mating_type) %>% 
   summarise(mean(rel_prehib_weightdiff))
+
+
+matingdata %>% 
+  filter(!(is.na(mating_type))) %>% 
+  group_by(mating_type) %>% 
+  summarise(median(rel_prehib_weightdiff))
 ```
 
 
@@ -108,7 +169,7 @@ matingdata %>%
 ### Set initial model
 
 ```{r}
-matingmodel1 <- lm(rel_prehib_weightdiff ~ mating_type+day_0_weight, data=matingdata)
+matingmodel1 <- lm(rel_prehib_weightdiff ~ mating_type + day_0_weight, data=matingdata)
 
 #for this step, i predict that mated bees will gain more weight regardless of how much they weigh at day 0, so i did not include an interaction. also i don't think we have the power to include an interaction (i.e., so few low weight mated and so few mated in general), so i think it's better to fit the simpler model. perhaps more balanced designs later can detect an interaction
 ```
@@ -128,31 +189,32 @@ With statistical tests:
 ```{r}
 #Test for normality
 shapiro.test(residuals(matingmodel1))
-#W = 0.94973, p-value = 0.1306
+#W = 0.94973, p-value = 0.0195
 
 #Test for homoscedasticity
 bptest(matingmodel1)
-#BP = 3.6985, df = 2, p-value = 0.1574
+#BP = 3.6985, df = 2, p-value = 0.5683
 ```
 
-Assumptions are met.
+Assumptions are not completely met, normality is violated.
 
 ### Examine results of model 1
 
 ```{r}
-Anova(matingmodel1, type = 3)
+car::Anova(matingmodel1, type = 3)
 
 #Anova Table (Type III tests)
 
 #Response: rel_prehib_weightdiff
-#               Sum Sq Df F value   Pr(>F)   
-#(Intercept)  0.081752  1 11.3878 0.002057 **
-#mating_type  0.092466  1 12.8801 0.001165 **
-#day_0_weight 0.018835  1  2.6236 0.115752   
-#Residuals    0.215369 30                    
+#             Sum Sq Df F value    Pr(>F)    
+#(Intercept)  0.06742  1 10.2507  0.002377 ** 
+#mating_type  0.11879  1 18.0596 9.326e-05 ***
+#day_0_weight 0.00358  1  0.5447  0.463953    
+#Residuals    0.32887 50                      
 #---
 #Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 ```
+
 
 ## Relationship between day mated and weight gain
 
@@ -163,7 +225,7 @@ matingdata %>%
   geom_point()
 ```
 
-doesn't look like much, so i think we're in the clear, but we can run stats on it later to be sure
+Doesn't look like much, so i think we're in the clear, but we can run stats on it later to be sure. Is this a question that you had while reading?
 
 
 ## Mortality Analysis
@@ -173,7 +235,7 @@ doesn't look like much, so i think we're in the clear, but we can run stats on i
 Figure of percent mortality by mating at 4 months
 
 ```{r}
-matingdata_survival %>% 
+matingdata %>% 
   filter(treatment == "Recovery C"|treatment=="Recovery G"| treatment == "4 month") %>% 
   drop_na(mating_type) %>% 
   group_by(status, mating_type) %>% 
@@ -191,28 +253,32 @@ matingdata_survival %>%
   scale_fill_manual(values = met.brewer("Homer1",2))
 ```
 
-Point graph of essentially the same info, not sure which one is better 
+Point graph of essentially the same info, I think I like this one better because you can see the gap and difference between light and heavy queens
 
 ```{r}
-matingdata_survival %>% 
+matingdata %>% 
+  filter(!(is.na(status))) %>% 
   ggplot(aes(x=day_0_weight, y=status, color=mating_type)) + 
   geom_point(position = position_jitter(w = 0, h = 0.05, seed = 22),size = 3)+
   theme_classic()+
-  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16),
+  theme(text = element_text(size = 16), 
+        axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(color = "black"),
         legend.position = "right",
         axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
         axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
   scale_x_continuous(name="Day 0 Weight (mg)")+
   scale_y_discrete(name ="Survival Status", limits = rev)+
-  scale_color_manual(values = met.brewer("Homer1",2))
+  scale_color_manual(name = "Mating Status", values = met.brewer("Homer1",2))
 ```
 
 
 With all end points
 
 ```{r}
-matingdata_survival %>% 
+matingdata %>% 
   drop_na(mating_type) %>% 
+  drop_na(status) %>% 
   group_by(status, mating_type) %>% 
   summarise(n=n()) %>% 
   ggplot(aes(x=status, y=n, fill=status)) + 
@@ -235,7 +301,7 @@ Using code from https://rcompanion.org/rcompanion/e_07.html, assumptions from ht
 Our variables have to be made numeric. Start by selecting just the variables that we want.
 
 ```{r}
-matingdata_survival_numeric <- matingdata_survival %>% 
+matingdata_survival_numeric <- matingdata %>% 
   select(day_0_weight, day_10_weight, mating_type, prehib_weightdiff, status)
 
 matingdata_survival_numeric$prehib_weightdiff <- as.numeric(matingdata_survival_numeric$prehib_weightdiff)
@@ -281,27 +347,17 @@ str(matingdata_survival_numeric_nofac)
 
 Examine correlation among variables
 
+**THIS IS THE STEP FOR CORRELATION TESTING**
+
 ```{r}
 chart.Correlation(matingdata_survival_numeric_nofac, method = "spearman", histogram = TRUE)
 ```
-
-Variance inflation factors to detect multi-colinearity
-
-```{r}
-vif(survival_model1)
-
-#      mating_type_num          day_0_weight rel_prehib_weightdiff 
-#             1.000000              1.133545              1.133545
-```
-
-No evidence of colinearity
 
 
 #### Survival Model 1
 
 ```{r}
 survival_model1 <- glm(status_num ~ mating_type_num + day_0_weight + rel_prehib_weightdiff, data = matingdata_survival_numeric_nofac, family= binomial)
-
 
 summary(survival_model1)
 
@@ -327,6 +383,17 @@ summary(survival_model1)
 #Number of Fisher Scoring iterations: 17
 ```
 
+Variance inflation factors to detect multi-colinearity
+
+```{r}
+vif(survival_model1)
+
+#      mating_type_num          day_0_weight rel_prehib_weightdiff 
+#             1.000000              1.133545              1.133545
+```
+
+No evidence of colinearity
+
 Plot residuals
 
 ```{r}
@@ -345,8 +412,21 @@ summary(survival_model1)$deviance / summary(survival_model1)$df.residual
 #0.962797
 ```
 
+#### Survival Model 2 and 3 - does removed mating_type or rel_prehib make a difference for significance?
+
+```{r}
+survival_model2 <- glm(status_num ~ mating_type_num + day_0_weight, data = matingdata_survival_numeric_nofac, family= binomial)
 
 
+summary(survival_model2)
+```
+
+```{r}
+survival_model3 <- glm(status_num ~ day_0_weight + rel_prehib_weightdiff, data = matingdata_survival_numeric_nofac, family= binomial)
+
+
+summary(survival_model3)
+```
 
 
 
