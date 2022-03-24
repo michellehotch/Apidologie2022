@@ -1,0 +1,335 @@
+---
+title: "Mating Short Communication Stats"
+author: Michelle Zoë Hotchkiss
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+# Set Up
+
+Load packages
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(car)
+library(lmtest)
+library(PerformanceAnalytics)
+library(MetBrewer)
+```
+
+
+Load data and recode variables.
+
+```{r}
+matingdata <- read.csv("data/matingdata.csv", stringsAsFactors = TRUE, na.strings=c(""))
+
+str(matingdata)
+
+matingdata$emergence_weight <- as.numeric(matingdata$emergence_weight)
+
+matingdata$end_weight <- as.numeric(matingdata$end_weight)
+
+matingdata$hib_weightloss <- as.numeric(matingdata$hib_weightloss)
+
+matingdata$rec_weightdiff <- as.numeric(matingdata$rec_weightdiff)
+
+```
+
+
+# Figure 1: Boxplot of mating type vs relative weight difference
+
+```{r}
+matingdata %>% 
+  filter(!(is.na(mating_type))) %>% 
+  ggplot(aes(x=mating_type, y=rel_prehib_weightdiff, fill=mating_type, color=mating_type)) + 
+  geom_boxplot(alpha=0.4, lwd=0.7)+
+  geom_jitter(shape=16, position=position_jitter(0.09), size=3)+
+  #geom_text(data = md_summary, aes(mating_type, Inf, label = n), vjust = 2)+
+  theme_classic()+
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(size = 16, color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_discrete(name="Mating Status")+
+  scale_y_continuous(name ="Relative Difference in Weight \nFrom 0 to 10 Days Post-Eclosion")+
+  scale_fill_met_d("Homer1")+
+  scale_color_met_d("Homer1")
+```
+
+
+#Figure 2a: Relative weight loos during hibernation vs. Weight at hibernation onset
+
+```{r}
+#make a variable for relative weight loss over hibernation
+
+matingdata$rel_hib_weightloss <- (matingdata$day_10_weight-matingdata$emerg_weight)/matingdata$day_10_weight
+
+#create plot
+
+fig2a <- matingdata %>% 
+  filter(!(is.na(status))) %>% 
+  filter(!(is.na(rel_hib_weightloss))) %>% 
+  ggplot(aes(x=day_10_weight, y=rel_hib_weightloss, color=mating_type)) + 
+  geom_point(position = position_jitter(w = 0, h = 0.05, seed = 22),size = 4,shape = 17)+
+  theme_classic()+
+  theme(text = element_text(size = 16), 
+        axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(color = "black"),
+        legend.position = "none",
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  scale_x_continuous(name="Weight at Hibernation Onset (mg)")+
+  scale_y_continuous(name ="Relative Weight Loss During Hibernation")+
+  scale_color_manual(name = "Mating Status", values = met.brewer("Homer1",2))
+```
+
+
+
+#Figure 2b: Survival vs. weight at eclosion
+
+
+```{r}
+fig2b <- matingdata %>% 
+  filter(!(is.na(status))) %>% 
+  ggplot(aes(x=day_0_weight, y=status, color=mating_type, size = rel_prehib_weightdiff)) + 
+  geom_point(position = position_jitter(w = 0, h = 0.15, seed = 22))+
+  theme_classic()+
+  theme(text = element_text(size = 16), 
+        axis.text.x = element_text(size = 16, color = "black"),
+        axis.text.y = element_text(color = "black"),
+        legend.position = "right",
+        legend.title=element_text(size=14),
+        axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
+  guides(colour = guide_legend(override.aes = list(size=4)), 
+         size = guide_legend(override.aes = list(colour = "#00b6e0")))+
+  scale_x_continuous(name="Weight at Eclosion (mg)")+
+  scale_y_discrete(name ="Survival Status", limits = rev)+
+  scale_color_manual(name = "Mating Status", values = met.brewer("Homer1",2))+
+  scale_size_continuous(name = "Relative Weight \nDifference")
+```
+
+
+#Assembling Figure 2
+
+```{r}
+ggarrange(fig2a, NULL, fig2b, 
+          nrow=1, 
+          widths = c(3,0.2,4), 
+          labels = c("A","","B"),
+          font.label = list(size = 20))
+```
+
+
+# Model 1: Relative pre-hibernation weight difference
+
+Examine means.
+
+```{r}
+matingdata %>% 
+  filter(!(is.na(mating_type))) %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(rel_prehib_weightdiff))
+```
+
+## Define model
+
+```{r}
+matingmodel1 <- lm(rel_prehib_weightdiff ~ mating_type + day_0_weight, data=matingdata)
+```
+
+##Test assumptions
+
+Visually:
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+plot(matingmodel1)
+par(opar)
+```
+
+With statistical tests:
+
+```{r}
+#Test for normality
+shapiro.test(residuals(matingmodel1))
+
+#Test for homoscedasticity
+bptest(matingmodel1)
+```
+
+Normality is violated in the formal test, but visually the data looks okay.
+
+## Results of Model 1
+
+```{r}
+car::Anova(matingmodel1, type = 3)
+```
+
+
+# Model 2: Survival Analysis
+
+Using code from https://rcompanion.org/rcompanion/e_07.html, assumptions from http://www.biostathandbook.com/multiplelogistic.html.
+
+##Prepare variables for model
+
+Make new variable for length of hibernation and code as numeric. 
+
+```{r}
+matingdata <- matingdata %>% 
+  mutate(hib_length = case_when(treatment == "4 month" ~ '3',
+                                treatment == "Recovery C" ~ '3',
+                                treatment == "Recovery G" ~ '3',
+                                treatment == "1 month" ~ '1',
+                                treatment == "2 month" ~ '2'))
+
+matingdata$hib_length <- as.numeric(matingdata$hib_length)
+
+str(matingdata)
+```
+
+Select desired variables and save to dataframe.
+
+```{r}
+matingdata_survival_numeric <- matingdata %>% 
+  select(day_0_weight, day_10_weight, mating_type, prehib_weightdiff, status, hib_length)
+
+matingdata_survival_numeric$prehib_weightdiff <- as.numeric(matingdata_survival_numeric$prehib_weightdiff)
+
+str(matingdata_survival_numeric)
+```
+
+Make all non-numeric variables numeric.
+
+```{r}
+matingdata_survival_numeric$mating_type_num <- as.numeric(matingdata_survival_numeric$mating_type)
+#1 = mated, 2 = unmated
+
+matingdata_survival_numeric$status_num <- as.numeric(matingdata_survival_numeric$status)
+#1 = alive, 2 = dead
+
+#change the 2 for dead to a zero
+matingdata_survival_numeric$status_num <-
+  replace(matingdata_survival_numeric$status_num,matingdata_survival_numeric$status_num == 2,0)
+
+#use str to double check that variables are coded properly
+str(matingdata_survival_numeric)
+```
+
+Make variable for relative pre-hibernation weight difference.
+
+```{r}
+matingdata_survival_numeric$rel_prehib_weightdiff <- ((matingdata_survival_numeric$day_10_weight-matingdata_survival_numeric$day_0_weight)/matingdata_survival_numeric$day_0_weight)
+  
+str(matingdata_survival_numeric)
+```
+
+
+##Correlation analysis
+
+Remove the factors for the correlation analysis.
+
+```{r}
+matingdata_survival_numeric_nofac <- matingdata_survival_numeric[-c(3,5)]
+str(matingdata_survival_numeric_nofac)
+```
+
+
+Examine correlation among variables.
+
+```{r}
+chart.Correlation(matingdata_survival_numeric_nofac, method = "spearman", histogram = TRUE)
+```
+
+
+##Define model and model selection
+
+**ASK FOR JESSICA'S OPINION - DO WE DO MODEL SELECTION AFTER THIS STEP? WE WOULD DROP MATING TYPE AND HIB LENGTH**
+
+```{r}
+survival_model2 <- glm(status_num ~ mating_type_num + day_0_weight + hib_length + rel_prehib_weightdiff, data = matingdata_survival_numeric_nofac, family= binomial)
+```
+
+Variance inflation factors to detect multi-colinearity.
+
+```{r}
+vif(survival_model1)
+```
+
+No evidence of colinearity
+
+Plot residuals
+
+```{r}
+plot(fitted(survival_model1),
+     rstandard(survival_model1))
+```
+
+Check for overdispersion
+
+Overdispersion is a situation where the residual deviance of the glm is large relative to the residual degrees of freedom. 
+One guideline is that if the ratio of the residual deviance to the residual degrees of freedom exceeds 1.5, then the model is overdispersed. 
+
+```{r}
+summary(survival_model1)$deviance / summary(survival_model1)$df.residual
+
+#0.962797
+```
+
+##Results of Model 2
+
+```{r}
+summary(survival_model2)
+```
+
+
+# Model 3: Relative weight loss during hibernation
+
+Examine means.
+
+```{r}
+matingdata %>% 
+  filter(!(is.na(mating_type))) %>% 
+  filter(!(is.na(rel_hib_weightloss))) %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(rel_hib_weightloss))
+```
+
+## Define model.
+
+```{r}
+weightloss3 <- lm(rel_hib_weightloss ~ mating_type + day_10_weight, data=matingdata)
+```
+
+##Test assumptions
+
+Visually:
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+plot(weightloss3)
+par(opar)
+```
+
+With statistical tests:
+
+```{r}
+#Test for normality
+shapiro.test(residuals(weightloss3))
+
+#Test for homoscedasticity
+bptest(weightloss3)
+```
+
+Assumptions are met.
+
+## Results of Model 3
+
+```{r}
+car::Anova(weightloss1, type = 3)
+```
+
+
