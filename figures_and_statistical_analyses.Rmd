@@ -8,7 +8,7 @@ editor_options:
 
 # Set Up
 
-Load packages
+Load packages.
 
 ```{r}
 library(tidyverse)
@@ -24,6 +24,7 @@ Load data and recode variables.
 
 ```{r}
 matingdata <- read.csv("data/matingdata.csv", stringsAsFactors = TRUE, na.strings=c(""))
+matingdata <- matingdata[-c(54,55,56,57,58,59), ]
 
 str(matingdata)
 
@@ -34,7 +35,6 @@ matingdata$end_weight <- as.numeric(matingdata$end_weight)
 matingdata$hib_weightloss <- as.numeric(matingdata$hib_weightloss)
 
 matingdata$rec_weightdiff <- as.numeric(matingdata$rec_weightdiff)
-
 ```
 
 
