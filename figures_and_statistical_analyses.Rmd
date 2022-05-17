@@ -33,8 +33,6 @@ matingdata$emergence_weight <- as.numeric(matingdata$emergence_weight)
 matingdata$end_weight <- as.numeric(matingdata$end_weight)
 
 matingdata$hib_weightloss <- as.numeric(matingdata$hib_weightloss)
-
-matingdata$rec_weightdiff <- as.numeric(matingdata$rec_weightdiff)
 ```
 
 
@@ -109,7 +107,7 @@ fig2b <- matingdata %>%
   scale_x_continuous(name="Weight at Eclosion (mg)")+
   scale_y_discrete(name ="Survival Status", limits = rev)+
   scale_color_manual(name = "Mating Status", values = met.brewer("Homer1",2))+
-  scale_size_continuous(name = "Relative Weight \nDifference")
+  scale_size_continuous(name = "Relative \nPre-Hibernation \nWeight \nDifference")
 ```
 
 
@@ -167,12 +165,67 @@ Normality is violated in the formal test, but visually the data looks okay.
 
 ```{r}
 car::Anova(matingmodel1, type = 3)
+summary(matingmodel1)
 ```
 
 
-# Model 2: Survival Analysis
+# Model 2: Relative weight loss during hibernation
 
-Using code from https://rcompanion.org/rcompanion/e_07.html, assumptions from http://www.biostathandbook.com/multiplelogistic.html.
+If figure code was not run, make variable for relative weight loss during hibernation. 
+
+```{r}
+matingdata$rel_hib_weightloss <- (matingdata$day_10_weight-matingdata$emerg_weight)/matingdata$day_10_weight
+```
+
+Examine means.
+
+```{r}
+matingdata %>% 
+  filter(!(is.na(mating_type))) %>% 
+  filter(!(is.na(rel_hib_weightloss))) %>% 
+  group_by(mating_type) %>% 
+  summarise(mean(rel_hib_weightloss))
+```
+
+## Define model.
+
+```{r}
+matingmodel2 <- lm(rel_hib_weightloss ~ mating_type + day_10_weight, data=matingdata)
+```
+
+##Test assumptions
+
+Visually:
+
+```{r}
+opar <- par(mfrow = c(2, 2))
+plot(matingmodel2)
+par(opar)
+```
+
+With statistical tests:
+
+```{r}
+#Test for normality
+shapiro.test(residuals(matingmodel2))
+
+#Test for homoscedasticity
+bptest(matingmodel2)
+```
+
+Assumptions are met.
+
+## Results of Model 3
+
+```{r}
+car::Anova(matingmodel2, type = 3)
+summary(matingmodel2)
+```
+
+
+# Model 3: Survival Analysis
+
+Using code from https://rcompanion.org/rcompanion/e_07.html, https://www.r-bloggers.com/2020/05/binary-logistic-regression-with-r/, assumptions from http://www.biostathandbook.com/multiplelogistic.html.
 
 ##Prepare variables for model
 
@@ -195,9 +248,7 @@ Select desired variables and save to dataframe.
 
 ```{r}
 matingdata_survival_numeric <- matingdata %>% 
-  select(day_0_weight, day_10_weight, mating_type, prehib_weightdiff, status, hib_length)
-
-matingdata_survival_numeric$prehib_weightdiff <- as.numeric(matingdata_survival_numeric$prehib_weightdiff)
+  select(day_0_weight, day_10_weight, mating_type, prehib_weightdiff, rel_prehib_weightdiff, status, hib_length)
 
 str(matingdata_survival_numeric)
 ```
@@ -219,21 +270,12 @@ matingdata_survival_numeric$status_num <-
 str(matingdata_survival_numeric)
 ```
 
-Make variable for relative pre-hibernation weight difference.
-
-```{r}
-matingdata_survival_numeric$rel_prehib_weightdiff <- ((matingdata_survival_numeric$day_10_weight-matingdata_survival_numeric$day_0_weight)/matingdata_survival_numeric$day_0_weight)
-  
-str(matingdata_survival_numeric)
-```
-
-
 ##Correlation analysis
 
-Remove the factors for the correlation analysis.
+Remove factors from the data set for the correlation analysis.
 
 ```{r}
-matingdata_survival_numeric_nofac <- matingdata_survival_numeric[-c(3,5)]
+matingdata_survival_numeric_nofac <- matingdata_survival_numeric[-c(3,6)]
 str(matingdata_survival_numeric_nofac)
 ```
 
@@ -247,89 +289,37 @@ chart.Correlation(matingdata_survival_numeric_nofac, method = "spearman", histog
 
 ##Define model and model selection
 
-**ASK FOR JESSICA'S OPINION - DO WE DO MODEL SELECTION AFTER THIS STEP? WE WOULD DROP MATING TYPE AND HIB LENGTH**
-
 ```{r}
-survival_model2 <- glm(status_num ~ mating_type_num + day_0_weight + hib_length + rel_prehib_weightdiff, data = matingdata_survival_numeric_nofac, family= binomial)
+matingmodel3 <- glm(status_num ~ mating_type_num + day_0_weight + hib_length + rel_prehib_weightdiff, data = matingdata_survival_numeric_nofac, family= binomial)
 ```
 
-Variance inflation factors to detect multi-colinearity.
+###Variance inflation factors to detect multi-colinearity.
 
 ```{r}
-vif(survival_model1)
+#from car package
+vif(matingmodel3)
 ```
 
 No evidence of colinearity
 
-Plot residuals
+###Plot residuals
 
 ```{r}
-plot(fitted(survival_model1),
-     rstandard(survival_model1))
+plot(fitted(matingmodel3),
+     rstandard(matingmodel3))
 ```
 
-Check for overdispersion
+###Check for overdispersion
 
-Overdispersion is a situation where the residual deviance of the glm is large relative to the residual degrees of freedom. 
-One guideline is that if the ratio of the residual deviance to the residual degrees of freedom exceeds 1.5, then the model is overdispersed. 
+Overdispersion is a situation where the residual deviance of the glm is large relative to the residual degrees of freedom. One guideline is that if the ratio of the residual deviance to the residual degrees of freedom exceeds 1.5, then the model is overdispersed. 
 
 ```{r}
-summary(survival_model1)$deviance / summary(survival_model1)$df.residual
-
-#0.962797
+summary(matingmodel3)$deviance / summary(matingmodel3)$df.residual
 ```
 
 ##Results of Model 2
 
 ```{r}
-summary(survival_model2)
+summary(matingmodel3)
 ```
-
-
-# Model 3: Relative weight loss during hibernation
-
-Examine means.
-
-```{r}
-matingdata %>% 
-  filter(!(is.na(mating_type))) %>% 
-  filter(!(is.na(rel_hib_weightloss))) %>% 
-  group_by(mating_type) %>% 
-  summarise(mean(rel_hib_weightloss))
-```
-
-## Define model.
-
-```{r}
-weightloss3 <- lm(rel_hib_weightloss ~ mating_type + day_10_weight, data=matingdata)
-```
-
-##Test assumptions
-
-Visually:
-
-```{r}
-opar <- par(mfrow = c(2, 2))
-plot(weightloss3)
-par(opar)
-```
-
-With statistical tests:
-
-```{r}
-#Test for normality
-shapiro.test(residuals(weightloss3))
-
-#Test for homoscedasticity
-bptest(weightloss3)
-```
-
-Assumptions are met.
-
-## Results of Model 3
-
-```{r}
-car::Anova(weightloss1, type = 3)
-```
-
 
