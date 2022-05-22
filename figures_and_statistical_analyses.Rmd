@@ -215,7 +215,7 @@ bptest(matingmodel2)
 
 Assumptions are met.
 
-## Results of Model 3
+## Results of Model 2
 
 ```{r}
 car::Anova(matingmodel2, type = 3)
@@ -317,7 +317,7 @@ Overdispersion is a situation where the residual deviance of the glm is large re
 summary(matingmodel3)$deviance / summary(matingmodel3)$df.residual
 ```
 
-##Results of Model 2
+##Results of Model 3
 
 ```{r}
 summary(matingmodel3)
