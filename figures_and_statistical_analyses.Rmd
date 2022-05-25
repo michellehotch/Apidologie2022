@@ -159,7 +159,7 @@ shapiro.test(residuals(matingmodel1))
 bptest(matingmodel1)
 ```
 
-Normality is violated in the formal test, but visually the data looks okay.
+Normality is violated in the formal test, but the test is very sensitive and visually the data looks fine.
 
 ## Results of Model 1
 
@@ -280,7 +280,7 @@ str(matingdata_survival_numeric_nofac)
 ```
 
 
-Examine correlation among variables.
+Examine correlation among variables. Select only variables that are not significantly correlated.
 
 ```{r}
 chart.Correlation(matingdata_survival_numeric_nofac, method = "spearman", histogram = TRUE)
@@ -295,12 +295,14 @@ matingmodel3 <- glm(status_num ~ mating_type_num + day_0_weight + hib_length + r
 
 ###Variance inflation factors to detect multi-colinearity.
 
+Values exceeding 5 are taken are evidence of collinearity. 
+
 ```{r}
 #from car package
 vif(matingmodel3)
 ```
 
-No evidence of colinearity
+No evidence of collinearity.
 
 ###Plot residuals
 
