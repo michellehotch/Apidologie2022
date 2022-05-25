@@ -58,10 +58,10 @@ matingdata %>%
 ```
 
 
-#Figure 2a: Relative weight loos during hibernation vs. Weight at hibernation onset
+#Figure 2a: Relative weight loos during diapause vs. Weight at diapause onset
 
 ```{r}
-#make a variable for relative weight loss over hibernation
+#make a variable for relative weight loss over diapause
 
 matingdata$rel_hib_weightloss <- (matingdata$day_10_weight-matingdata$emerg_weight)/matingdata$day_10_weight
 
@@ -79,15 +79,13 @@ fig2a <- matingdata %>%
         legend.position = "none",
         axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 20, b = 0, l = 0)),
         axis.title.x = element_text(size = 16, margin = margin(t = 20, r = 0, b = 0, l = 0)))+
-  scale_x_continuous(name="Weight at Hibernation Onset (mg)")+
-  scale_y_continuous(name ="Relative Weight Loss During Hibernation")+
+  scale_x_continuous(name="Weight at Diapause Onset (mg)")+
+  scale_y_continuous(name ="Relative Weight Loss During Diapause")+
   scale_color_manual(name = "Mating Status", values = met.brewer("Homer1",2))
 ```
 
 
-
 #Figure 2b: Survival vs. weight at eclosion
-
 
 ```{r}
 fig2b <- matingdata %>% 
@@ -107,7 +105,7 @@ fig2b <- matingdata %>%
   scale_x_continuous(name="Weight at Eclosion (mg)")+
   scale_y_discrete(name ="Survival Status", limits = rev)+
   scale_color_manual(name = "Mating Status", values = met.brewer("Homer1",2))+
-  scale_size_continuous(name = "Relative \nPre-Hibernation \nWeight \nDifference")
+  scale_size_continuous(name = "Relative \nPre-Diapause \nWeight \nDifference")
 ```
 
 
@@ -122,7 +120,7 @@ ggarrange(fig2a, NULL, fig2b,
 ```
 
 
-# Model 1: Relative pre-hibernation weight difference
+# Model 1: Relative pre-diapause weight difference
 
 Examine means.
 
@@ -169,9 +167,9 @@ summary(matingmodel1)
 ```
 
 
-# Model 2: Relative weight loss during hibernation
+# Model 2: Relative weight loss during diapause
 
-If figure code was not run, make variable for relative weight loss during hibernation. 
+If figure code was not run, make variable for relative weight loss during diapause. 
 
 ```{r}
 matingdata$rel_hib_weightloss <- (matingdata$day_10_weight-matingdata$emerg_weight)/matingdata$day_10_weight
@@ -229,7 +227,7 @@ Using code from https://rcompanion.org/rcompanion/e_07.html, https://www.r-blogg
 
 ##Prepare variables for model
 
-Make new variable for length of hibernation and code as numeric. 
+Make new variable for length of diapause and code as numeric. 
 
 ```{r}
 matingdata <- matingdata %>% 
