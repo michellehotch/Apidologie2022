@@ -24,15 +24,13 @@ Load data and recode variables.
 
 ```{r}
 matingdata <- read.csv("data/matingdata.csv", stringsAsFactors = TRUE, na.strings=c(""))
-matingdata <- matingdata[-c(54,55,56,57,58,59), ]
 
 str(matingdata)
 
-matingdata$emergence_weight <- as.numeric(matingdata$emergence_weight)
-
-matingdata$end_weight <- as.numeric(matingdata$end_weight)
-
+matingdata$emerg_weight <- as.numeric(matingdata$emerg_weight)
 matingdata$hib_weightloss <- as.numeric(matingdata$hib_weightloss)
+
+matingdata$rel_hib_weightloss <- (matingdata$day_10_weight-matingdata$emerg_weight)/matingdata$day_10_weight
 ```
 
 
@@ -61,10 +59,6 @@ matingdata %>%
 #Figure 2a: Relative weight loos during diapause vs. Weight at diapause onset
 
 ```{r}
-#make a variable for relative weight loss over diapause
-
-matingdata$rel_hib_weightloss <- (matingdata$day_10_weight-matingdata$emerg_weight)/matingdata$day_10_weight
-
 #create plot
 
 fig2a <- matingdata %>% 
