@@ -1,5 +1,5 @@
 ---
-title: "Mating Short Communication Stats"
+title: "Mated bumble bee (Bombus impatiens) queens gain more pre-diapause weight than virgin queens"
 author: Michelle Zoë Hotchkiss
 output: html_notebook
 editor_options: 
