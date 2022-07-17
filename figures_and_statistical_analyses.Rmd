@@ -1,6 +1,6 @@
 ---
 title: "Mated bumble bee (Bombus impatiens) queens gain more pre-diapause weight than virgin queens"
-author: Michelle Zoë Hotchkiss
+author: Michelle Zoë Hotchkiss, Jessica R. K. Forrest
 output: html_notebook
 editor_options: 
   chunk_output_type: console
