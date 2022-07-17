@@ -141,17 +141,6 @@ plot(matingmodel1)
 par(opar)
 ```
 
-With statistical tests:
-
-```{r}
-#Test for normality
-shapiro.test(residuals(matingmodel1))
-
-#Test for homoscedasticity
-bptest(matingmodel1)
-```
-
-Normality is violated in the formal test, but the test is very sensitive and visually the data looks fine.
 
 ## Results of Model 1
 
@@ -194,18 +183,6 @@ opar <- par(mfrow = c(2, 2))
 plot(matingmodel2)
 par(opar)
 ```
-
-With statistical tests:
-
-```{r}
-#Test for normality
-shapiro.test(residuals(matingmodel2))
-
-#Test for homoscedasticity
-bptest(matingmodel2)
-```
-
-Assumptions are met.
 
 ## Results of Model 2
 
